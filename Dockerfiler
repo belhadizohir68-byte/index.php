@@ -1,12 +1,20 @@
+# استخدام صورة PHP الرسمية مع خادم Apache
 FROM php:8.2-apache
 
-# تحديث وتثبيت مكتبات SQLite
+# تثبيت الحزم المطلوبة (إذا احتجت أي إضافات أخرى لاحقاً)
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     && docker-php-ext-install pdo pdo_sqlite
 
-# نسخ الملفات إلى الخادم
+# تفعيل الـ Rewrite Module في أباتشي إذا لزم الأمر
+RUN a2enmod rewrite
+
+# نسخ ملفات المشروع من جهازك إلى داخل حاوية الدوكر
 COPY . /var/www/html/
 
-# ضبط الصلاحيات
-RUN chown -R www-data:www-data /var/www/html
+# ضبط الصلاحيات المناسبة لملفات المشروع وقاعدة البيانات SQLite
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
+
+# فتح المنفذ 80 للويب
+EXPOSE 80

@@ -2,7 +2,7 @@
 // إظهار الأخطاء بوضوح على الشاشة للتشخيص الفوري
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+error_reporting(E_ALL); 
 
 // اتصال قاعدة البيانات مع رسالة خطأ واضحة
 try {

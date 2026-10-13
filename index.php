@@ -153,4 +153,17 @@ if (isset($_GET['export']) && $_GET['export'] == 'true') {$filename = !empty($fi
     }
 
     foreach ($export_logs as$row) {
-        fputcsv($output,
+        fputcsv($output, [$row['id'], 
+            $row['code'],$row['public_ip'], 
+            $row['local_ip'],$row['country'], 
+            $row['city'],$row['lat'], 
+            $row['lon'],$row['isp'], 
+            $row['device_info'],$row['screen_res'], 
+            $row['timezone'],$row['created_at']
+        ]);
+    }
+    fclose($output);
+    exit();
+}
+
+if (!empty($filter_code))

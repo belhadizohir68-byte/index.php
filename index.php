@@ -90,4 +90,67 @@ if (isset($_GET['r'])) {
     $stmt->execute([$code]);
     $link =$stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($link) {
+    if ($link) {$target = $link['target_url'];$public_ip = get_real_ip();
+        $local_ip =$_GET['lip'] ?? 'غير متوفر';
+        $geo = get_ip_details($public_ip);
+        $ua =$_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        $device = get_device_type($ua);
+        $screen =$_GET['screen'] ?? 'غير متوفر';
+        $tz =$_GET['tz'] ?? 'غير متوفر';
+
+        try {
+            $logStmt =$db->prepare("INSERT INTO logs (code, public_ip, local_ip, country, city, lat, lon, isp, device_info, screen_res, timezone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $logStmt->execute([$code, $public_ip,$local_ip, $geo['country'],$geo['city'], $geo['lat'],$geo['lon'], $geo['isp'],$device, $screen,$tz]);
+        } catch (Exception $e) {
+            // الاستمرار في حالة خطأ السجل
+        }
+
+        header("Location: " . $target);
+        exit();
+    } else {
+        die("الرابط غير موجود.");
+    }
+}
+
+// 2. إنشاء رابط جديد
+$generated_link = "";
+$tracking_code = "";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' and isset($_POST['create'])) {
+    $target_url = trim($_POST['target_url']);
+    if (!filter_var($target_url, FILTER_VALIDATE_URL)) {
+        $target_url = "https://" . $target_url;
+    }
+
+    $code = substr(md5(uniqid(rand(), true)), 0, 7);
+    $stmt =$db->prepare("INSERT INTO links (code, target_url) VALUES (?, ?)");
+    $stmt->execute([$code,$target_url]);
+
+    $tracking_code =$code;
+    $domain = $_SERVER['HTTP_HOST'];$generated_link = "https://" . $domain . "/?r=" . $code;
+}
+
+$total_links =$db->query("SELECT COUNT(*) FROM links")->fetchColumn();
+$total_visits =$db->query("SELECT COUNT(*) FROM logs")->fetchColumn();
+
+$filter_code = trim($_GET['track'] ?? '');
+
+// 3. تصدير البيانات إلى ملف CSV لكل بحث أو سجلات
+if (isset($_GET['export']) && $_GET['export'] == 'true') {$filename = !empty($filter_code) ? "report_{$filter_code}.csv" : "all_logs_report.csv";
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    
+    $output = fopen('php://output', 'w');
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+    
+    fputcsv($output, ['ID', 'Code', 'Public IP', 'Local IP', 'Country', 'City', 'Latitude', 'Longitude', 'ISP', 'Device Info', 'Screen Resolution', 'Timezone', 'Created At']);
+
+    if (!empty($filter_code)) {
+        $stmt =$db->prepare("SELECT * FROM logs WHERE code = ? ORDER BY id DESC");
+        $stmt->execute([$filter_code]);
+        $export_logs =$stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $export_logs =$db->query("SELECT * FROM logs ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    foreach ($export_logs as$row) {
+        fputcsv($output,
